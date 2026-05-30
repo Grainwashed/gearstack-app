@@ -597,7 +597,7 @@ function EstateSalesTab({ projects, donors }) {
 }
 
 // ── Deal Finder ────────────────────────────────────────────────────────────────
-function DealFinder({ apiKey, projects, donors, onNegotiate }) {
+function DealFinder({ projects, donors, onNegotiate }) {
   const [query, setQuery] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [minMargin, setMinMargin] = useState("25");
@@ -614,27 +614,19 @@ function DealFinder({ apiKey, projects, donors, onNegotiate }) {
   const search = async () => {
     if (!query.trim()) return;
     setLoading(true); setError(""); setIsDemo(false);
-    if (!apiKey) {
+    try {
+      const params = new URLSearchParams({ q: query + (condition !== "Any" ? " " + condition : ""), limit: 24 });
+      const res = await fetch(`${SERVER_URL}/ebay-search?${params}`);
+      if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error || `Server error ${res.status}`); }
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Search failed");
+      const items = (data.items||[]).filter(i => !blacklist.some(b => i.title?.toLowerCase().includes(b.toLowerCase())));
+      if (items.length === 0) { setIsDemo(true); setResults(MOCK_DEALS); }
+      else setResults(items);
+    } catch(e) {
+      setError(e.message);
       setIsDemo(true);
-      await new Promise(r => setTimeout(r, 700));
-      setResults(MOCK_DEALS.filter(item => {
-        const p = parseFloat(item.price.value);
-        const m = marginPct(p, item.marketPrice);
-        return (!maxPrice || p <= parseFloat(maxPrice))
-          && (!m || m >= parseInt(minMargin || 0))
-          && (condition === "Any" || item.condition === condition)
-          && !blacklist.some(b => item.title.toLowerCase().includes(b.toLowerCase()));
-      }));
-    } else {
-      try {
-        const params = new URLSearchParams({ q: query + (condition !== "Any" ? " " + condition : ""), limit: 24 });
-        const res = await fetch(`https://api.ebay.com/buy/browse/v1/item_summary/search?${params}`, {
-          headers:{ Authorization:`Bearer ${apiKey}`, "Content-Type":"application/json", "X-EBAY-C-MARKETPLACE-ID":"EBAY_US" }
-        });
-        if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.errors?.[0]?.message || `eBay error ${res.status}`); }
-        const data = await res.json();
-        setResults((data.itemSummaries||[]).filter(i => !blacklist.some(b => i.title?.toLowerCase().includes(b.toLowerCase()))));
-      } catch(e) { setError(e.message); }
+      setResults(MOCK_DEALS);
     }
     setLoading(false);
   };
@@ -1485,4 +1477,9 @@ function PriceAnalyzer() {
       {data && <>
         {data.note && <div className="demo" style={{marginBottom:12}}>{data.note}</div>}
         <div className="sg">
-          {[["Avg Sold Price","$"+data.avgSol
+          {[["Avg Sold Price","$"+data.avgSold,"last 90 days","var(--accent)"],["Avg Asking","$"+data.avgAsking,"current listings","var(--muted)"],["Buy Below","$"+data.bestBuyBelow,"for 30%+ margin","var(--accent2)"],["Target List At","$"+data.targetSell,"fast-sell price","var(--success)"]].map(([l,v,s,c])=>(
+            <div key={l} className="sc"><div className="slb">{l}</div><div className="sv" style={{color:c}}>{v}</div><div className="ss">{s}</div></div>
+          ))}
+        </div>
+        <div className="tc">
+          <div classNa
