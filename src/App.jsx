@@ -2,12 +2,13 @@ import React from "react"
 import { useState, useEffect } from "react";
 
 const TABS = [
-  { id: "deals",    label: "Deal Finder",      icon: "⚡" },
-  { id: "estate",   label: "Estate Sales",     icon: "🏚" },
-  { id: "projects", label: "Projects & Donors", icon: "🔧" },
-  { id: "scanner",  label: "Serial Scanner",    icon: "🔍" },
-  { id: "prices",   label: "Price Analyzer",    icon: "📊" },
-  { id: "pnl",      label: "P&L",               icon: "💰" },
+  { id: "deals",     label: "Deal Finder",       icon: "⚡" },
+  { id: "estate",    label: "Estate Sales",      icon: "🏚" },
+  { id: "projects",  label: "Projects & Donors", icon: "🔧" },
+  { id: "liststack", label: "ListStack",          icon: "📋" },
+  { id: "scanner",   label: "Serial Scanner",    icon: "🔍" },
+  { id: "prices",    label: "Price Analyzer",    icon: "📊" },
+  { id: "pnl",       label: "P&L",               icon: "💰" },
 ];
 
 const POPULAR_SEARCHES = {
@@ -111,7 +112,6 @@ const MOCK_DONORS = [
 
 const SERVER_URL = "https://gearstack-server-production.up.railway.app";
 
-// West Coast city coordinates for quick selection
 const WEST_COAST_CITIES = [
   { label:"Seattle, WA",      lat:"47.6062", lng:"-122.3321" },
   { label:"Portland, OR",     lat:"45.5051", lng:"-122.6750" },
@@ -135,11 +135,9 @@ async function callClaude(prompt, system = "") {
 }
 
 async function callClaudeWithSearch(prompt, system = "") {
-  // Claude with web search may stop_reason="tool_use" and need a follow-up turn
   const messages = [{ role: "user", content: prompt }];
   const tools = [{ type: "web_search_20250305", name: "web_search" }];
   let fullText = "";
-
   for (let turn = 0; turn < 5; turn++) {
     const body = { model: "claude-sonnet-4-20250514", max_tokens: 2000, tools, messages };
     if (system) body.system = system;
@@ -149,24 +147,16 @@ async function callClaudeWithSearch(prompt, system = "") {
     const d = await r.json();
     if (d.error) throw new Error("API error: " + (d.error.message || JSON.stringify(d.error)));
     const content = d.content || [];
-
-    // Collect any text from this turn
     fullText += content.filter(b => b.type === "text").map(b => b.text).join("");
-
     if (d.stop_reason === "end_turn") break;
-
     if (d.stop_reason === "tool_use") {
-      // Build tool results for next turn
       const toolResults = content
         .filter(b => b.type === "tool_use")
         .map(b => ({ type: "tool_result", tool_use_id: b.id, content: "Search completed." }));
       messages.push({ role: "assistant", content });
       messages.push({ role: "user", content: toolResults });
-    } else {
-      break;
-    }
+    } else { break; }
   }
-
   return fullText;
 }
 
@@ -399,7 +389,7 @@ The buyer (us) is a skilled camera technician who can diagnose and repair most i
 
 Write:
 1. OPENING OFFER PRICE — suggest a specific dollar amount to open at (aim 20-30% below our actual target, leaving room to settle). Format as: "Opening offer: $XX"
-2. TARGET PRICE — what we actually want to land at. Format as: "Target price: $XX"  
+2. TARGET PRICE — what we actually want to land at. Format as: "Target price: $XX"
 3. OFFER MESSAGE — the actual message to send the seller. Should be:
    - Polite and respectful, not aggressive
    - Frame the uncertainty as a shared risk we're being asked to absorb
@@ -498,16 +488,10 @@ function EstateSalesTab({ projects, donors }) {
       const res = await fetch(url);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Server error");
-      if (pg === 1) {
-        setResults(data.sales || []);
-      } else {
-        setResults(prev => [...prev, ...(data.sales || [])]);
-      }
+      if (pg === 1) { setResults(data.sales || []); } else { setResults(prev => [...prev, ...(data.sales || [])]); }
       setHasMore((data.sales || []).length >= 10);
       setPage(pg);
-    } catch(e) {
-      setError(e.message);
-    }
+    } catch(e) { setError(e.message); }
     setLoading(false);
   };
 
@@ -561,7 +545,7 @@ function EstateSalesTab({ projects, donors }) {
         <div className="empty">
           <div className="ei">&#127968;</div>
           <div className="et">Hunt estate sales</div>
-          <div className="es">Claude searches EstateSales.net in real time. Pick a city, set your radius, hit Search. Results matched against your projects and donors.</div>
+          <div className="es">Claude searches EstateSales.net in real time. Pick a city, set your radius, hit Search.</div>
         </div>
       )}
       {results.length > 0 && (
@@ -664,7 +648,6 @@ function DealFinder({ apiKey, projects, donors, onNegotiate }) {
         <div><div className="pt">Deal <span>Finder</span></div><div className="ps">Surface underpriced gear — scored for margin, risk, and your project database</div></div>
         <button className="pill" onClick={() => setShowBl(s=>!s)}>⊘ Blacklist ({blacklist.length})</button>
       </div>
-
       {showBl && (
         <div className="box">
           <div className="sl">Model Blacklist — suppressed from all results</div>
@@ -672,10 +655,8 @@ function DealFinder({ apiKey, projects, donors, onNegotiate }) {
           <div className="tr">{blacklist.map(b=><span key={b} className="tag" onClick={()=>setBlacklist(p=>p.filter(x=>x!==b))} title="Click to remove">{b} ✕</span>)}{!blacklist.length&&<span style={{fontSize:11,color:"var(--muted)"}}>None</span>}</div>
         </div>
       )}
-
       {isDemo && <div className="demo">⚡ Demo mode — sample deals. Add eBay API key for live results.</div>}
       {error  && <div className="err">⚠ {error}</div>}
-
       <div className="box">
         <div className="row">
           <div className="f" style={{flex:2}}><label>Search</label><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="e.g. Canon AE-1, Helios 44-2, camera lot…" /></div>
@@ -699,7 +680,6 @@ function DealFinder({ apiKey, projects, donors, onNegotiate }) {
           ))}
         </div>
       </div>
-
       {alerts.length > 0 && (
         <div style={{marginBottom:14}}>
           <div className="sl">Saved Alerts ({alerts.length})</div>
@@ -711,10 +691,8 @@ function DealFinder({ apiKey, projects, donors, onNegotiate }) {
           ))}
         </div>
       )}
-
       {loading && <div className="loading"><div className="spin"/>&nbsp;Scanning eBay listings…</div>}
       {!loading && !results.length && !error && <div className="empty"><div className="ei">⚡</div><div className="et">Ready to hunt</div><div className="es">Results are scored for margin and risk, and automatically matched against your projects and donor inventory.</div></div>}
-
       {!loading && results.length > 0 && (
         <>
           <div style={{fontSize:11,color:"var(--muted)",marginBottom:9}}>{results.length} listings{isDemo?" (demo)":""}</div>
@@ -848,7 +826,6 @@ function ProjectsTab({ projects, setProjects, donors, setDonors, onGenerate }) {
           <button className="btn bp" onClick={()=>tab==="projects"?setShowAddP(s=>!s):setShowAddD(s=>!s)}>+ Add {tab==="projects"?"Project":"Donor"}</button>
         </div>
       </div>
-
       {showImport && (
         <div className="box" style={{marginBottom:12}}>
           <div className="sl">Import Data</div>
@@ -857,12 +834,10 @@ function ProjectsTab({ projects, setProjects, donors, setDonors, onGenerate }) {
           <div className="row" style={{justifyContent:"flex-end"}}><button className="btn bs" onClick={()=>{setShowImport(false);setImportResult(null);setImportText("");}}>Cancel</button><button className="btn bp" onClick={runImport} disabled={!importText.trim()}>Import</button></div>
         </div>
       )}
-
       <div className="itabs">
         <button className={`itb${tab==="projects"?" on":""}`} onClick={()=>setTab("projects")}>🔧 Projects ({projects.filter(p=>p.status!=="Complete").length} active)</button>
         <button className={`itb${tab==="donors"?" on":""}`}   onClick={()=>setTab("donors")}>🗄 Donors ({donors.filter(d=>d.status!=="Fully Harvested").length} available)</button>
       </div>
-
       {tab==="projects" && <>
         {showAddP && (
           <div className="box">
@@ -887,7 +862,7 @@ function ProjectsTab({ projects, setProjects, donors, setDonors, onGenerate }) {
             <div className="ph2">
               <div><div className="pm2">{p.model}</div><div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}><SBadge status={p.status}/><span className="bdg bdg-u">{p.repairType}</span></div></div>
               <div style={{display:"flex",gap:4}}>
-                {p.status==="Ready to List"&&<button className="btn bsu" style={{fontSize:10,padding:"4px 9px"}} onClick={()=>onGenerate(p)}>Generate Listing</button>}
+                {(p.status==="Ready to List"||p.status==="In Progress"||p.status==="Have Donor")&&<button className="btn bsu" style={{fontSize:10,padding:"4px 9px"}} onClick={()=>onGenerate(p)}>→ ListStack</button>}
                 <button className="btn bd" style={{fontSize:10,padding:"4px 7px"}} onClick={()=>delP(p.id)}>✕</button>
               </div>
             </div>
@@ -907,7 +882,6 @@ function ProjectsTab({ projects, setProjects, donors, setDonors, onGenerate }) {
           </div>
         ))}
       </>}
-
       {tab==="donors" && <>
         {showAddD && (
           <div className="box">
@@ -937,38 +911,481 @@ function ProjectsTab({ projects, setProjects, donors, setDonors, onGenerate }) {
   );
 }
 
-// ── Listing Modal ──────────────────────────────────────────────────────────────
-function ListingModal({ project, onClose }) {
-  const [loading, setLoading] = useState(false);
-  const [listing, setListing] = useState("");
-  const [tone, setTone] = useState("Detailed");
-  const [price, setPrice] = useState("");
-  const [copied, setCopied] = useState(false);
+// ── ListStack Tab ──────────────────────────────────────────────────────────────
+function ListStackTab({ projects, sales, setSales }) {
+  const [photos, setPhotos]               = useState([]);
+  const [notes, setNotes]                 = useState("");
+  const [tone, setTone]                   = useState("");
+  const [linkedProject, setLinkedProject] = useState(null);
+  const [generatedTitle, setGeneratedTitle] = useState("");
+  const [generatedDesc, setGeneratedDesc]   = useState("");
+  const [generating, setGenerating]         = useState(false);
+  const [showPreview, setShowPreview]       = useState(false);
+  const [marketComps, setMarketComps]       = useState(null);
+  const [loadingComps, setLoadingComps]     = useState(false);
+  const [price, setPrice]                 = useState("");
+  const [drafts, setDrafts]               = useState([]);
+  const [history, setHistory]             = useState([]);
+  const [activeSection, setActiveSection] = useState("compose");
+  const [dragOver, setDragOver]           = useState(false);
+  const [offerPct, setOfferPct]           = useState("10");
+  const [offerDays, setOfferDays]         = useState("7");
+  const [copied, setCopied]               = useState(false);
+  const [postStatus, setPostStatus]       = useState("");
+  const [titleCount, setTitleCount]       = useState(0);
+  const [notification, setNotification]   = useState("");
+
+  useEffect(() => {
+    storageGet("ls_drafts").then(d => d && setDrafts(d));
+    storageGet("ls_history").then(d => d && setHistory(d));
+  }, []);
+
+  // Auto-save draft
+  useEffect(() => {
+    if (!generatedTitle && !generatedDesc && !notes) return;
+    const draft = { id:"draft_current", title:generatedTitle, desc:generatedDesc, notes, tone, price, linkedProjectId:linkedProject?.id||null, savedAt:new Date().toISOString() };
+    storageSet("ls_draft_current", draft);
+  }, [generatedTitle, generatedDesc, notes, tone, price, linkedProject]);
+
+  useEffect(() => { setTitleCount(generatedTitle.length); }, [generatedTitle]);
+
+  const addPhotos = (files) => {
+    const newPhotos = Array.from(files).filter(f=>f.type.startsWith("image/")).map((file,i)=>({
+      id:"ph_"+Date.now()+i, file, previewUrl:URL.createObjectURL(file), order:photos.length+i
+    }));
+    setPhotos(prev => [...prev, ...newPhotos]);
+  };
+
+  const handleDrop = (e) => { e.preventDefault(); setDragOver(false); addPhotos(e.dataTransfer.files); };
+
+  const movePhoto = (id, dir) => {
+    setPhotos(prev => {
+      const idx = prev.findIndex(p=>p.id===id);
+      const next = [...prev];
+      const swap = idx+dir;
+      if (swap<0||swap>=next.length) return prev;
+      [next[idx],next[swap]]=[next[swap],next[idx]];
+      return next.map((p,i)=>({...p,order:i}));
+    });
+  };
+
+  const removePhoto = (id) => setPhotos(prev=>prev.filter(p=>p.id!==id));
+
+  const readyProjects = projects.filter(p=>
+    p.status==="Ready to List"||p.status==="In Progress"||p.status==="Have Donor"||p.status==="Pending Arrival"
+  );
+
+  const projectContext = linkedProject
+    ? `Camera/Lens: ${linkedProject.model}\nRepair type: ${linkedProject.repairType}\nStatus: ${linkedProject.status}\nCost basis: $${linkedProject.costBasis||0}\nRepair spend: $${linkedProject.repairCost||0}\nTarget sell: $${linkedProject.targetSell||"not set"}\nProject notes: ${linkedProject.notes||"none"}`
+    : "";
+
+  const personalComps = linkedProject
+    ? history.filter(h=>{
+        if (!h.model||!linkedProject.model) return false;
+        const a=h.model.toLowerCase().split(" ").slice(0,2).join(" ");
+        const b=linkedProject.model.toLowerCase().split(" ").slice(0,2).join(" ");
+        return a===b;
+      })
+    : [];
+
+  const fetchComps = async (model) => {
+    setLoadingComps(true); setMarketComps(null);
+    try {
+      const result = await callClaudeWithSearch(
+        `Search eBay sold listings for "${model}" and return a JSON object (no markdown) with: {"avgSold":number,"low":number,"high":number,"recentSales":[{"price":number,"condition":"string","title":"string"}],"note":"brief market insight string"}. Use only actual recent eBay sold data. Keep recentSales to 3-5 items.`,
+        "You are a camera market analyst. Return only valid JSON, no markdown fences."
+      );
+      const clean = result.replace(/```json|```/g,"").trim();
+      setMarketComps(JSON.parse(clean));
+    } catch {
+      setMarketComps({ avgSold:null, low:null, high:null, recentSales:[], note:"Comps unavailable — check API connection." });
+    }
+    setLoadingComps(false);
+  };
 
   const generate = async () => {
-    setLoading(true); setListing("");
-    const result = await callClaude(`You are an expert camera reseller writing an eBay listing.\n\nModel: ${project.model}\nRepair type: ${project.repairType}\nWork done / notes: ${project.notes}\nCost basis: $${project.costBasis}\nRepair spend: $${project.repairCost}\nTarget price: ${price?"$"+price:"suggest based on market"}\nTone: ${tone}\n\nWrite:\n1. TITLE (80 chars max)\n2. CONDITION (one line)\n3. DESCRIPTION (make repair history a trust signal)\n4. SUGGESTED PRICE (with brief reasoning)\n\nBe honest and specific.`);
-    setListing(result); setLoading(false);
+    if (!notes.trim() && !linkedProject) {
+      setNotification("Add some notes or link a project before generating.");
+      setTimeout(()=>setNotification(""),3000);
+      return;
+    }
+    setGenerating(true); setGeneratedTitle(""); setGeneratedDesc(""); setShowPreview(false);
+    const compModel = linkedProject?.model || notes.split(" ").slice(0,4).join(" ");
+    fetchComps(compModel);
+
+    const personalCompContext = personalComps.length
+      ? `\nYour personal sales history for this model:\n${personalComps.map(c=>`- Sold for $${c.sellPrice} on ${c.date}`).join("\n")}`
+      : "";
+
+    const prompt = `You are writing an eBay listing for a camera reseller who is a knowledgeable enthusiast and skilled technician. Avoid bullet-point data dumps. Write like a photographer who knows this gear well.
+
+${projectContext ? "PROJECT DATA:\n"+projectContext : ""}
+SELLER NOTES: ${notes||"none"}
+TONE DIRECTION: ${tone||"knowledgeable enthusiast — conversational, specific, honest. Sound like someone who actually uses this gear."}
+${personalCompContext}
+
+Write ONLY:
+TITLE: [eBay title, max 80 characters, front-load key search terms]
+DESCRIPTION:
+[3-5 sentences. Lead with what makes this item worth buying. Mention any work done as a trust signal. Be specific about condition. End with one sentence about who this is ideal for. NO bullet points. NO ALL CAPS sections.]`;
+
+    const result = await callClaude(prompt);
+    const titleMatch = result.match(/TITLE:\s*(.+)/i);
+    const descMatch  = result.match(/DESCRIPTION:\s*([\s\S]+)/i);
+    setGeneratedTitle(titleMatch ? titleMatch[1].trim() : "");
+    setGeneratedDesc(descMatch  ? descMatch[1].trim()  : result);
+    setGenerating(false);
+    setShowPreview(true);
   };
-  useEffect(() => { generate(); }, []);
-  const copy = () => { navigator.clipboard?.writeText(listing); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  const saveDraft = () => {
+    if (!generatedTitle && !generatedDesc) return;
+    const draft = {
+      id:"draft_"+Date.now(), title:generatedTitle, desc:generatedDesc, notes, tone, price,
+      model:linkedProject?.model||notes.split(" ").slice(0,3).join(" "),
+      linkedProjectId:linkedProject?.id||null, savedAt:new Date().toISOString()
+    };
+    const updated = [draft,...drafts];
+    setDrafts(updated); storageSet("ls_drafts",updated);
+    setNotification("Draft saved."); setTimeout(()=>setNotification(""),2500);
+  };
+
+  const loadDraft = (draft) => {
+    setGeneratedTitle(draft.title); setGeneratedDesc(draft.desc);
+    setNotes(draft.notes||""); setTone(draft.tone||""); setPrice(draft.price||"");
+    const proj = projects.find(p=>p.id===draft.linkedProjectId);
+    if (proj) setLinkedProject(proj);
+    setShowPreview(true); setActiveSection("compose");
+  };
+
+  const deleteDraft = (id) => {
+    const updated = drafts.filter(d=>d.id!==id);
+    setDrafts(updated); storageSet("ls_drafts",updated);
+  };
+
+  const markPosted = () => {
+    if (!generatedTitle) return;
+    const totalIn = linkedProject ? (parseFloat(linkedProject.costBasis)||0)+(parseFloat(linkedProject.repairCost)||0) : 0;
+    const sellP = parseFloat(price)||0;
+    const profit = sellP-totalIn;
+    const margin = totalIn>0 ? Math.round((profit/totalIn)*100) : 0;
+
+    const record = {
+      id:"ls_"+Date.now(),
+      model:linkedProject?.model||notes.split(" ").slice(0,3).join(" "),
+      title:generatedTitle, desc:generatedDesc, sellPrice:sellP,
+      costBasis:linkedProject?.costBasis||0, repairCost:linkedProject?.repairCost||0,
+      profit, margin, tone, offerPct, offerDays,
+      listedAt:new Date().toISOString(), soldAt:null, status:"Active",
+    };
+
+    if (sellP>0 && linkedProject) {
+      const saleRecord = {
+        id:"s_"+Date.now(), model:record.model,
+        buyPrice:record.costBasis, sellPrice:sellP, repairCost:record.repairCost,
+        buy:record.costBasis, sell:sellP, rep:record.repairCost,
+        profit, margin, category:"Camera", date:new Date().toISOString().split("T")[0],
+      };
+      const updatedSales = [saleRecord,...(sales||[])];
+      setSales(updatedSales); storageSet("sales",updatedSales);
+    }
+
+    const updatedHistory = [record,...history];
+    setHistory(updatedHistory); storageSet("ls_history",updatedHistory);
+
+    setGeneratedTitle(""); setGeneratedDesc(""); setNotes(""); setTone("");
+    setPrice(""); setLinkedProject(null); setPhotos([]); setMarketComps(null); setShowPreview(false);
+    setPostStatus("✓ Listing saved to history"+(sellP>0?" and P&L.":"."));
+    setTimeout(()=>setPostStatus(""),4000);
+  };
+
+  const copy = (text) => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  const titleOver = titleCount>80;
+  const titleWarn = titleCount>70&&!titleOver;
+
+  const roi = linkedProject && price ? (() => {
+    const totalIn=(parseFloat(linkedProject.costBasis)||0)+(parseFloat(linkedProject.repairCost)||0);
+    const profit=parseFloat(price)-totalIn;
+    const pct=totalIn>0?Math.round((profit/totalIn)*100):0;
+    return { profit:profit.toFixed(2), pct, totalIn:totalIn.toFixed(2) };
+  })() : null;
 
   return (
-    <div className="ov" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal">
-        <div className="mt">Generate Listing — {project.model}</div>
-        <div className="row" style={{marginBottom:10}}>
-          <div className="f"><label>Tone</label><select value={tone} onChange={e=>setTone(e.target.value)}><option>Detailed</option><option>Approachable</option></select></div>
-          <div className="f"><label>Target Price ($)</label><input value={price} onChange={e=>setPrice(e.target.value)} placeholder="Leave blank to auto-suggest" type="number" /></div>
-          <div style={{display:"flex",alignItems:"flex-end"}}><button className="btn bs" onClick={generate} disabled={loading}>Regenerate</button></div>
+    <div className="panel">
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <div>
+          <div className="pt">List<span>Stack</span></div>
+          <div className="ps">Photo → AI-written listing → eBay. Enthusiast voice, SEO-optimized.</div>
         </div>
-        {loading && <div className="loading"><div className="spin"/>&nbsp;Claude is writing your listing…</div>}
-        {listing && <div className="lo">{listing}</div>}
-        <div className="mact">
-          {listing && <button className="btn bp" onClick={copy}>{copied?"Copied!":"Copy Listing"}</button>}
-          <button className="btn bs" onClick={onClose}>Close</button>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <button className={`pill${activeSection==="compose"?" on":""}`} onClick={()=>setActiveSection("compose")}>✏ Compose</button>
+          <button className={`pill${activeSection==="history"?" on":""}`} onClick={()=>setActiveSection("history")}>📁 History ({history.length})</button>
+          {drafts.length>0&&<button className={`pill${activeSection==="drafts"?" on":""}`} onClick={()=>setActiveSection("drafts")}>💾 Drafts ({drafts.length})</button>}
         </div>
       </div>
+
+      {notification&&<div className="demo" style={{marginBottom:12}}>{notification}</div>}
+      {postStatus&&<div style={{background:"rgba(71,255,178,.07)",border:"1px solid rgba(71,255,178,.2)",borderRadius:4,padding:"8px 11px",fontSize:11,color:"var(--success)",marginBottom:12}}>{postStatus}</div>}
+
+      {/* ── COMPOSE ── */}
+      {activeSection==="compose"&&(
+        <>
+          {/* Project link */}
+          <div className="box" style={{marginBottom:10}}>
+            <div className="sl">Link a Project — pulls repair history & cost data into the listing</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <button className={`pill${!linkedProject?" on":""}`} onClick={()=>setLinkedProject(null)}>None</button>
+              {readyProjects.map(p=>(
+                <button key={p.id} className={`pill${linkedProject?.id===p.id?" on":""}`} onClick={()=>setLinkedProject(linkedProject?.id===p.id?null:p)}>
+                  {p.model.split(" ").slice(0,3).join(" ")}
+                </button>
+              ))}
+            </div>
+            {linkedProject&&(
+              <div style={{fontSize:11,color:"var(--muted)",marginTop:6,padding:"6px 8px",background:"var(--surface2)",borderRadius:4,lineHeight:1.7}}>
+                <span style={{color:"var(--accent2)"}}>🔧 {linkedProject.model}</span> · Cost ${linkedProject.costBasis||0} · Repair ${linkedProject.repairCost||0} · Target ${linkedProject.targetSell||"—"}
+                <div style={{fontSize:10,color:"var(--muted)",marginTop:3}}>{linkedProject.notes?.slice(0,120)}{linkedProject.notes?.length>120?"…":""}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Photos */}
+          <div className="box" style={{marginBottom:10}}>
+            <div className="sl">Photos — first photo = lead image on eBay</div>
+            <div
+              onDrop={handleDrop}
+              onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+              onDragLeave={()=>setDragOver(false)}
+              onClick={()=>document.getElementById("ls-file-input").click()}
+              style={{border:`2px dashed ${dragOver?"var(--accent)":"var(--border)"}`,borderRadius:5,padding:"18px 12px",textAlign:"center",cursor:"pointer",fontSize:12,color:dragOver?"var(--accent)":"var(--muted)",transition:"all .2s",background:dragOver?"rgba(232,255,71,.04)":"transparent"}}
+            >
+              {photos.length===0
+                ? <><div style={{fontSize:24,marginBottom:4}}>📷</div>Drag & drop or tap to browse</>
+                : <span style={{color:"var(--accent)"}}>+ Add more photos</span>}
+            </div>
+            <input id="ls-file-input" type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
+            {photos.length>0&&(
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
+                {photos.map((ph,idx)=>(
+                  <div key={ph.id} style={{position:"relative",width:80}}>
+                    <img src={ph.previewUrl} alt="" style={{width:80,height:80,objectFit:"cover",borderRadius:4,border:idx===0?"2px solid var(--accent)":"2px solid var(--border)"}}/>
+                    {idx===0&&<div style={{position:"absolute",top:2,left:2,fontSize:8,background:"var(--accent)",color:"#000",padding:"1px 4px",borderRadius:2,fontWeight:700}}>LEAD</div>}
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+                      <button onClick={()=>movePhoto(ph.id,-1)} disabled={idx===0} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:10,padding:"1px 3px"}}>◀</button>
+                      <button onClick={()=>removePhoto(ph.id)} style={{background:"none",border:"none",color:"var(--danger)",cursor:"pointer",fontSize:10,padding:"1px 3px"}}>✕</button>
+                      <button onClick={()=>movePhoto(ph.id,1)} disabled={idx===photos.length-1} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:10,padding:"1px 3px"}}>▶</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Notes + Tone */}
+          <div className="box" style={{marginBottom:10}}>
+            <div className="f" style={{marginBottom:8}}>
+              <label>Item Notes — condition, quirks, history, what was done</label>
+              <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Full CLA done — shutter speeds verified on tester, all seals replaced with fresh foam, mirror bumper replaced. Glass is exceptionally clean, no haze or fungus. Self-timer works. Includes original strap and both body caps." style={{minHeight:90}}/>
+            </div>
+            <div className="f">
+              <label>Tone — describe the voice you want</label>
+              <textarea value={tone} onChange={e=>setTone(e.target.value)} placeholder="e.g. Knowledgeable enthusiast, like describing it to a friend at a camera swap meet. Conversational, honest, specific — not salesy." style={{minHeight:55}}/>
+            </div>
+          </div>
+
+          {/* Generate */}
+          <div style={{display:"flex",gap:7,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+            <button className="btn bp" onClick={generate} disabled={generating} style={{flex:1}}>
+              {generating?"Writing listing…":"Generate Listing"}
+            </button>
+            {generatedTitle&&<button className="btn bs" onClick={saveDraft}>Save Draft</button>}
+          </div>
+          {generating&&<div className="loading"><div className="spin"/>&nbsp;Claude is writing your listing…</div>}
+
+          {/* Output */}
+          {showPreview&&generatedTitle&&(
+            <div style={{marginBottom:14}}>
+              {/* Title */}
+              <div className="box" style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <label>Title</label>
+                  <span style={{fontSize:10,color:titleOver?"var(--danger)":titleWarn?"var(--accent)":"var(--muted)"}}>
+                    {titleCount}/80{titleOver?" — over limit!":titleWarn?" — getting close":""}
+                  </span>
+                </div>
+                <input value={generatedTitle} onChange={e=>setGeneratedTitle(e.target.value)} style={{borderColor:titleOver?"var(--danger)":titleWarn?"var(--accent)":"var(--border)"}}/>
+              </div>
+
+              {/* Description */}
+              <div className="box" style={{marginBottom:8}}>
+                <label>Description</label>
+                <textarea value={generatedDesc} onChange={e=>setGeneratedDesc(e.target.value)} style={{minHeight:120,marginTop:4}}/>
+              </div>
+
+              {/* Price + ROI */}
+              <div className="box" style={{marginBottom:8}}>
+                <div className="row" style={{alignItems:"flex-end"}}>
+                  <div className="f">
+                    <label>List Price ($)</label>
+                    <input value={price} onChange={e=>setPrice(e.target.value)} type="number" placeholder="0.00"/>
+                  </div>
+                  {roi&&(
+                    <div style={{flex:2,padding:"6px 10px",background:"var(--surface2)",borderRadius:4,border:"1px solid var(--border)",fontSize:11,lineHeight:1.7}}>
+                      <span style={{color:"var(--muted)"}}>In: </span><span>${roi.totalIn}</span>
+                      <span style={{color:"var(--muted)",marginLeft:10}}>Profit: </span>
+                      <span style={{color:parseFloat(roi.profit)>0?"var(--success)":"var(--danger)"}}>${roi.profit}</span>
+                      <span style={{color:"var(--muted)",marginLeft:10}}>ROI: </span>
+                      <span style={{color:roi.pct>50?"var(--success)":roi.pct>20?"var(--accent)":"var(--danger)"}}>{roi.pct}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Watcher offers — stubbed until Inventory API */}
+              <div className="box" style={{marginBottom:8,opacity:0.55}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <div>
+                    <div style={{fontSize:11,color:"var(--text)"}}>Auto-send offers to watchers</div>
+                    <div style={{fontSize:10,color:"var(--muted)"}}>Requires eBay Inventory API — coming in next build</div>
+                  </div>
+                  <div style={{width:36,height:20,borderRadius:10,background:"var(--border)",position:"relative",cursor:"not-allowed"}}>
+                    <div style={{position:"absolute",top:3,left:3,width:14,height:14,borderRadius:"50%",background:"var(--muted)"}}/>
+                  </div>
+                </div>
+                <div className="row" style={{opacity:0.5,pointerEvents:"none"}}>
+                  <div className="f"><label>After (days)</label><input value={offerDays} onChange={e=>setOfferDays(e.target.value)} type="number"/></div>
+                  <div className="f"><label>Discount (%)</label><input value={offerPct} onChange={e=>setOfferPct(e.target.value)} type="number"/></div>
+                </div>
+              </div>
+
+              {/* Comps */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                <div className="box">
+                  <div className="sl" style={{marginBottom:6}}>Market Comps</div>
+                  {loadingComps&&<div className="loading" style={{padding:8}}><div className="spin"/>&nbsp;Fetching…</div>}
+                  {!loadingComps&&marketComps&&(
+                    <>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                        <div><div style={{fontSize:10,color:"var(--muted)"}}>Avg sold</div><div style={{fontSize:16,color:"var(--accent)",fontFamily:"Syne,sans-serif",fontWeight:700}}>{marketComps.avgSold?"$"+marketComps.avgSold:"—"}</div></div>
+                        <div style={{textAlign:"right"}}><div style={{fontSize:10,color:"var(--muted)"}}>Range</div><div style={{fontSize:12,color:"var(--text)"}}>{marketComps.low&&marketComps.high?`$${marketComps.low}–$${marketComps.high}`:"—"}</div></div>
+                      </div>
+                      {marketComps.note&&<div style={{fontSize:10,color:"var(--muted)",lineHeight:1.5,borderTop:"1px solid var(--border)",paddingTop:5,marginTop:2}}>{marketComps.note}</div>}
+                      {(marketComps.recentSales||[]).slice(0,3).map((s,i)=>(
+                        <div key={i} style={{fontSize:10,color:"var(--muted)",padding:"2px 0",borderBottom:"1px solid var(--border)"}}>
+                          <span style={{color:"var(--success)"}}>${s.price}</span> — {s.condition} — {s.title?.slice(0,35)}…
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {!loadingComps&&!marketComps&&<div style={{fontSize:11,color:"var(--muted)"}}>Loads after generation</div>}
+                </div>
+                <div className="box">
+                  <div className="sl" style={{marginBottom:6}}>Your Sales History</div>
+                  {personalComps.length===0&&<div style={{fontSize:11,color:"var(--muted)",lineHeight:1.6}}>No personal sales for this model yet. Builds over time as you list.</div>}
+                  {personalComps.map((c,i)=>(
+                    <div key={i} style={{fontSize:10,padding:"4px 0",borderBottom:"1px solid var(--border)",lineHeight:1.5}}>
+                      <div style={{color:"var(--success)",fontSize:13,fontFamily:"Syne,sans-serif",fontWeight:700}}>${c.sellPrice}</div>
+                      <div style={{color:"var(--muted)"}}>{c.date}</div>
+                    </div>
+                  ))}
+                  {personalComps.length>0&&(
+                    <div style={{marginTop:6,fontSize:11,color:"var(--accent)"}}>
+                      Avg: ${Math.round(personalComps.reduce((a,c)=>a+(c.sellPrice||0),0)/personalComps.length)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:14}}>
+                <button className="btn bp" style={{flex:1}} onClick={markPosted}>Save to History + P&L</button>
+                <button className="btn bs" onClick={()=>copy(generatedTitle+"\n\n"+generatedDesc)}>{copied?"Copied!":"Copy Listing"}</button>
+                <button className="btn bs" onClick={generate} disabled={generating}>Regenerate</button>
+              </div>
+
+              {/* eBay preview */}
+              <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:6,overflow:"hidden"}}>
+                <div style={{padding:"8px 12px",background:"var(--surface2)",borderBottom:"1px solid var(--border)",fontSize:10,color:"var(--muted)",letterSpacing:"1.5px",textTransform:"uppercase"}}>eBay listing preview</div>
+                <div style={{padding:14}}>
+                  <div style={{fontFamily:"Syne,sans-serif",fontWeight:700,fontSize:15,marginBottom:8,lineHeight:1.3}}>{generatedTitle}</div>
+                  {price&&<div style={{fontSize:20,color:"var(--accent)",fontFamily:"Syne,sans-serif",fontWeight:800,marginBottom:10}}>${parseFloat(price).toFixed(2)}</div>}
+                  <div style={{fontSize:12,lineHeight:1.8,color:"var(--text)",whiteSpace:"pre-wrap"}}>{generatedDesc}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── HISTORY ── */}
+      {activeSection==="history"&&(
+        <>
+          {history.length===0&&(
+            <div className="empty">
+              <div className="ei">📋</div>
+              <div className="et">No listing history yet</div>
+              <div className="es">Listings you generate and save will appear here with pricing, margin, and sell-through data.</div>
+            </div>
+          )}
+          {history.map(h=>{
+            const daysAgo=Math.floor((Date.now()-new Date(h.listedAt))/86400000);
+            const needsAttention=h.status==="Active"&&daysAgo>=parseInt(h.offerDays||7);
+            return (
+              <div key={h.id} className="pc" style={{borderColor:needsAttention?"rgba(232,255,71,.3)":"var(--border)"}}>
+                <div className="ph2">
+                  <div>
+                    <div className="pm2">{h.model}</div>
+                    <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                      <span className={`bdg ${h.status==="Active"?"bdg-lo":"bdg-u"}`}>{h.status}</span>
+                      {needsAttention&&<span className="bdg bdg-me">⚡ {daysAgo}d — check comps</span>}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    {h.sellPrice>0&&<div style={{fontFamily:"Syne,sans-serif",fontWeight:700,fontSize:15,color:"var(--accent)"}}>${h.sellPrice}</div>}
+                    {h.profit!==0&&<div style={{fontSize:11,color:h.profit>0?"var(--success)":"var(--danger)"}}>{h.profit>0?"+":""}${h.profit?.toFixed(2)} · {h.margin}%</div>}
+                  </div>
+                </div>
+                <div className="pmeta">Listed {new Date(h.listedAt).toLocaleDateString()} · {daysAgo}d ago</div>
+                <div className="pn" style={{fontSize:11}}>{h.title}</div>
+                <div className="pact">
+                  <button className="pill" style={{fontSize:9}} onClick={()=>{
+                    const updated=history.map(x=>x.id===h.id?{...x,status:x.status==="Active"?"Sold":"Active"}:x);
+                    setHistory(updated); storageSet("ls_history",updated);
+                  }}>{h.status==="Active"?"Mark Sold":"Mark Active"}</button>
+                  <button className="pill d" style={{fontSize:9}} onClick={()=>{
+                    const updated=history.filter(x=>x.id!==h.id);
+                    setHistory(updated); storageSet("ls_history",updated);
+                  }}>Delete</button>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* ── DRAFTS ── */}
+      {activeSection==="drafts"&&(
+        <>
+          {drafts.length===0&&<div className="empty"><div className="ei">💾</div><div className="et">No saved drafts</div></div>}
+          {drafts.map(d=>(
+            <div key={d.id} className="pc">
+              <div className="ph2">
+                <div>
+                  <div className="pm2">{d.model||"Untitled draft"}</div>
+                  <div className="pmeta">{new Date(d.savedAt).toLocaleDateString()}</div>
+                </div>
+                <div style={{display:"flex",gap:4}}>
+                  <button className="btn bsu" style={{fontSize:10,padding:"4px 9px"}} onClick={()=>loadDraft(d)}>Load</button>
+                  <button className="btn bd" style={{fontSize:10,padding:"4px 7px"}} onClick={()=>deleteDraft(d.id)}>✕</button>
+                </div>
+              </div>
+              {d.title&&<div className="pn" style={{fontSize:11}}>{d.title}</div>}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -1051,8 +1468,7 @@ function PriceAnalyzer() {
     } else {
       d = { avgSold:87.50, avgAsking:102.30, bestBuyBelow:55, targetSell:89, fastSellers:["Tested working","Glass is clean","Includes caps","Seals replaced","Recently CLA'd"], slowSellers:["For parts only","Fungus noted","No caps","Sticky shutter untested"] };
     }
-    setData(d);
-    setLoading(false);
+    setData(d); setLoading(false);
   };
 
   return (
@@ -1069,139 +1485,4 @@ function PriceAnalyzer() {
       {data && <>
         {data.note && <div className="demo" style={{marginBottom:12}}>{data.note}</div>}
         <div className="sg">
-          {[["Avg Sold Price","$"+data.avgSold,"last 90 days","var(--accent)"],["Avg Asking","$"+data.avgAsking,"current listings","var(--muted)"],["Buy Below","$"+data.bestBuyBelow,"for 30%+ margin","var(--accent2)"],["Target List At","$"+data.targetSell,"fast-sell price","var(--success)"]].map(([l,v,s,c])=>(
-            <div key={l} className="sc"><div className="slb">{l}</div><div className="sv" style={{color:c}}>{v}</div><div className="ss">{s}</div></div>
-          ))}
-        </div>
-        <div className="tc">
-          <div className="box"><div className="sl" style={{color:"var(--success)"}}>Fast-sell signals</div>{data.fastSellers.map(k=><div key={k} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid var(--border)",color:"var(--text)"}}>✓ {k}</div>)}</div>
-          <div className="box"><div className="sl" style={{color:"var(--danger)"}}>Slow-sell signals</div>{data.slowSellers.map(k=><div key={k} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid var(--border)",color:"var(--muted)"}}>✗ {k}</div>)}</div>
-        </div>
-      </>}
-      {!loading && !data && <div className="empty"><div className="ei">📊</div><div className="et">Market intelligence</div></div>}
-    </div>
-  );
-}
-
-// ── P&L Tracker ───────────────────────────────────────────────────────────────
-function PnL() {
-  const [sales, setSales] = useState([]);
-  const [form, setForm] = useState({ model:"", buyPrice:"", sellPrice:"", repairCost:"0", category:"Camera", date:new Date().toISOString().split("T")[0] });
-
-  useEffect(()=>{ storageGet("sales").then(d=>d&&setSales(d)); },[]);
-
-  const add = () => {
-    if (!form.model||!form.buyPrice||!form.sellPrice) return;
-    const buy=parseFloat(form.buyPrice), sell=parseFloat(form.sellPrice), rep=parseFloat(form.repairCost||0);
-    const profit=sell-buy-rep, margin=Math.round((profit/sell)*100);
-    const u=[{ id:"s"+Date.now(), ...form, buy, sell, rep, profit, margin },...sales];
-    setSales(u); storageSet("sales",u);
-    setForm(f=>({...f,model:"",buyPrice:"",sellPrice:"",repairCost:"0"}));
-  };
-  const del = id=>{ const u=sales.filter(s=>s.id!==id); setSales(u); storageSet("sales",u); };
-
-  const rev  = sales.reduce((s,x)=>s+x.sell,0);
-  const prof = sales.reduce((s,x)=>s+x.profit,0);
-  const avgM = sales.length ? Math.round(sales.reduce((s,x)=>s+x.margin,0)/sales.length) : 0;
-  const best = sales.length ? sales.reduce((a,b)=>a.profit>b.profit?a:b) : null;
-
-  return (
-    <div className="panel">
-      <div style={{marginBottom:14}}><div className="pt">P<span>&</span>L Tracker</div><div className="ps">Log every sale — track what's actually making money</div></div>
-      {sales.length>0 && (
-        <div className="sg">
-          {[["Total Revenue","$"+rev.toFixed(2),sales.length+" sales","var(--text)"],["Total Profit","$"+prof.toFixed(2),"after all costs","var(--success)"],["Avg Margin",avgM+"%","per sale","var(--accent)"],["Best Sale",best?"$"+best.profit.toFixed(2):"—",best?.model||"","var(--accent2)"]].map(([l,v,s,c])=>(
-            <div key={l} className="sc"><div className="slb">{l}</div><div className="sv" style={{color:c}}>{v}</div><div className="ss">{s}</div></div>
-          ))}
-        </div>
-      )}
-      <div className="box">
-        <div className="sl">Log a Sale</div>
-        <div className="tc">
-          <div className="f"><label>Model</label><input value={form.model} onChange={e=>setForm(f=>({...f,model:e.target.value}))} placeholder="e.g. Canon AE-1"/></div>
-          <div className="f"><label>Category</label><select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}><option>Camera</option><option>Lens</option><option>Gear</option><option>Lot</option><option>Donor Parts</option></select></div>
-          <div className="f"><label>Buy Price ($)</label><input value={form.buyPrice} onChange={e=>setForm(f=>({...f,buyPrice:e.target.value}))} type="number" placeholder="0.00"/></div>
-          <div className="f"><label>Sell Price ($)</label><input value={form.sellPrice} onChange={e=>setForm(f=>({...f,sellPrice:e.target.value}))} type="number" placeholder="0.00"/></div>
-          <div className="f"><label>Repair Cost ($)</label><input value={form.repairCost} onChange={e=>setForm(f=>({...f,repairCost:e.target.value}))} type="number" placeholder="0.00"/></div>
-          <div className="f"><label>Date Sold</label><input value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} type="date"/></div>
-        </div>
-        <div style={{display:"flex",justifyContent:"flex-end"}}><button className="btn bp" onClick={add}>Log Sale</button></div>
-      </div>
-      {!sales.length && <div className="empty"><div className="ei">💰</div><div className="et">No sales logged</div></div>}
-      {sales.map(s=>(
-        <div key={s.id} className="plrow">
-          <div>
-            <div style={{fontFamily:"Syne,sans-serif",fontWeight:600,fontSize:13}}>{s.model}</div>
-            <div style={{fontSize:10,color:"var(--muted)"}}>{s.category} · {s.date} · bought ${s.buy.toFixed(2)} · sold ${s.sell.toFixed(2)}{s.rep>0?` · repair $${s.rep.toFixed(2)}`:""}</div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:7}}>
-            <div style={{fontFamily:"Syne,sans-serif",fontWeight:700,fontSize:14,color:s.profit>=0?"var(--success)":"var(--danger)"}}>{s.profit>=0?"+":""}${s.profit.toFixed(2)}</div>
-            <span className="bdg bdg-deal">{s.margin}%</span>
-            <button className="btn bd" style={{fontSize:10,padding:"3px 6px"}} onClick={()=>del(s.id)}>✕</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Root ───────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [tab, setTab]       = useState("deals");
-  const [apiKey, setApiKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [projects, setProjects] = useState(MOCK_PROJECTS);
-  const [donors,   setDonors]   = useState(MOCK_DONORS);
-  const [listingProject, setListingProject] = useState(null);
-  const [negotiateItem, setNegotiateItem] = useState(null);
-  const [negotiateRisk, setNegotiateRisk] = useState(null);
-  const openNegotiate = (item, risk) => { setNegotiateItem(item); setNegotiateRisk(risk); };
-
-  useEffect(()=>{
-    storageGet("projects").then(d=>d&&setProjects(d));
-    storageGet("donors").then(d=>d&&setDonors(d));
-  },[]);
-
-  const ks = apiKey.length > 20 ? "g" : apiKey.length > 0 ? "y" : null;
-
-  return (
-    <>
-      <style>{css}</style>
-      <div className="app">
-        <div className="hdr">
-          <div className="hdr-top">
-            <div><div className="mark">GEAR<span>STACK</span></div><div className="sub">Camera reseller intelligence suite</div></div>
-            <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap",marginTop:6}}>
-              {ks && <div style={{fontSize:11,color:ks==="g"?"var(--success)":"var(--accent)",display:"flex",alignItems:"center",gap:5}}><span className={`dot ${ks}`}/>{ks==="g"?"eBay connected":"Key too short"}</div>}
-
-            </div>
-          </div>
-          <div className="api-row">
-            <input className="api-in" type={showKey?"text":"password"} value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="eBay API key (optional — demo mode works without it)"/>
-            <button className="pill" onClick={()=>setShowKey(s=>!s)}>{showKey?"Hide":"Show"}</button>
-            {apiKey && <button className="pill d" onClick={()=>setApiKey("")}>Clear</button>}
-          </div>
-
-        </div>
-
-        <div className="tabs">
-          {TABS.map(t=>(
-            <button key={t.id} className={`tb${tab===t.id?" on":""}`} onClick={()=>setTab(t.id)}>
-              <span style={{marginRight:5}}>{t.icon}</span>{t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab==="deals"    && <DealFinder apiKey={apiKey} projects={projects} donors={donors} onNegotiate={openNegotiate}/>}
-        {tab==="estate"   && <EstateSalesTab projects={projects} donors={donors}/>}
-        {tab==="projects" && <ProjectsTab projects={projects} setProjects={setProjects} donors={donors} setDonors={setDonors} onGenerate={setListingProject}/>}
-        {tab==="scanner"  && <SerialScanner/>}
-        {tab==="prices"   && <PriceAnalyzer/>}
-        {tab==="pnl"      && <PnL/>}
-
-        {listingProject && <ListingModal project={listingProject} onClose={()=>setListingProject(null)}/>}
-        {negotiateItem && <NegotiateModal item={negotiateItem} risk={negotiateRisk} onClose={()=>{setNegotiateItem(null);setNegotiateRisk(null);}}/>}
-      </div>
-    </>
-  );
-}
+          {[["Avg Sold Price","$"+data.avgSol
