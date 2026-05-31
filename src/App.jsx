@@ -132,7 +132,7 @@ async function callClaude(prompt, system = "") {
   const r = await fetch(`${SERVER_URL}/claude`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
   const d = await r.json();
   if (d.error) throw new Error("Anthropic error: " + (d.error.message || JSON.stringify(d.error)));
-  if (!d.content) throw new Error("Empty response from server. HTTP status: " + r.status + " — raw: " + JSON.stringify(d).slice(0,200));
+  if (!d.content) throw new Error("Empty response. HTTP " + r.status + " — " + JSON.stringify(d).slice(0,200));
   return d.content.map(b => b.text||"").join("") || "";
 }
 
