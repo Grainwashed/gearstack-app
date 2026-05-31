@@ -131,7 +131,9 @@ async function callClaude(prompt, system = "") {
   if (system) body.system = system;
   const r = await fetch(`${SERVER_URL}/claude`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
   const d = await r.json();
-  return d.content?.map(b => b.text||"").join("") || "";
+  if (d.error) throw new Error("Anthropic error: " + (d.error.message || JSON.stringify(d.error)));
+  if (!d.content) throw new Error("Empty response from server. HTTP status: " + r.status + " — raw: " + JSON.stringify(d).slice(0,200));
+  return d.content.map(b => b.text||"").join("") || "";
 }
 
 async function callClaudeWithSearch(prompt, system = "") {
@@ -1026,23 +1028,15 @@ TITLE: [eBay title, max 80 characters, front-load key search terms]
 DESCRIPTION:
 [3-5 sentences. Lead with what makes this item worth buying. Mention any work done as a trust signal. Be specific about condition. End with one sentence about who this is ideal for. NO bullet points. NO ALL CAPS sections.]`;
 
-    let result = "";
-    try {
-      result = await Promise.race([
-        callClaude(prompt),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out after 60 seconds")), 60000)),
-      ]);
-    } catch(err) {
-      setGenerating(false);
-      setNotification("Generation failed: " + (err?.message || String(err)));
-      setTimeout(() => setNotification(""), 15000);
-      return;
-    }
+    const result = await Promise.race([
+      callClaude(prompt),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 60000)),
+    ]).catch(() => "");
 
     if (!result) {
       setGenerating(false);
-      setNotification("Generation returned empty — server may have responded but with no content.");
-      setTimeout(() => setNotification(""), 8000);
+      setNotification("Generation timed out — try again, or generate without a linked project.");
+      setTimeout(() => setNotification(""), 5000);
       return;
     }
 
