@@ -1026,15 +1026,23 @@ TITLE: [eBay title, max 80 characters, front-load key search terms]
 DESCRIPTION:
 [3-5 sentences. Lead with what makes this item worth buying. Mention any work done as a trust signal. Be specific about condition. End with one sentence about who this is ideal for. NO bullet points. NO ALL CAPS sections.]`;
 
-    const result = await Promise.race([
-      callClaude(prompt),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 60000)),
-    ]).catch(() => "");
+    let result = "";
+    try {
+      result = await Promise.race([
+        callClaude(prompt),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out after 60 seconds")), 60000)),
+      ]);
+    } catch(err) {
+      setGenerating(false);
+      setNotification("Generation failed: " + (err?.message || String(err)));
+      setTimeout(() => setNotification(""), 15000);
+      return;
+    }
 
     if (!result) {
       setGenerating(false);
-      setNotification("Generation timed out — try again, or generate without a linked project.");
-      setTimeout(() => setNotification(""), 5000);
+      setNotification("Generation returned empty — server may have responded but with no content.");
+      setTimeout(() => setNotification(""), 8000);
       return;
     }
 
@@ -1678,4 +1686,3 @@ export default function App() {
     </>
   );
 }
-
